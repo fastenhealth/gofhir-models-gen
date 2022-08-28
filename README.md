@@ -1,3 +1,7 @@
+# Golang FHIR Models
+
+This repository contains a tool that can be used to generate FHIR R4 Go Models. 
+
 # Usage
 
 ```
