@@ -29,6 +29,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var packageName string
+
 type Resource struct {
 	ResourceType string
 	Url          *string
@@ -254,7 +256,7 @@ func generateResourceOrType(resources ResourceMap, requiredTypes map[string]bool
 	}
 
 	fmt.Printf("Generate Go sources for StructureDefinition: %s\n", definition.Name)
-	file := jen.NewFile("fhir")
+	file := jen.NewFile(packageName)
 	appendLicenseComment(file)
 	appendGeneratorComment(file)
 
@@ -498,5 +500,6 @@ func typeCodeToTypeIdentifier(typeCode string) string {
 }
 
 func init() {
+	genResourcesCmd.Flags().StringVar(&packageName, "package", "fhir", "the package name to use for generated files")
 	rootCmd.AddCommand(genResourcesCmd)
 }

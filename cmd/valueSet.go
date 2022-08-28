@@ -41,7 +41,7 @@ func generateValueSet(resources ResourceMap, valueSet fhir.ValueSet) (*jen.File,
 	}
 
 	fmt.Printf("Generate Go sources for ValueSet: %s\n", *valueSet.Name)
-	file := jen.NewFile("fhir")
+	file := jen.NewFile(packageName)
 	appendLicenseComment(file)
 	appendGeneratorComment(file)
 
