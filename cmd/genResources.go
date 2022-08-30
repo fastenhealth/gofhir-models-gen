@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	. "strings"
 	"unicode"
 
@@ -327,9 +327,8 @@ func generateResourceOrType(resources ResourceMap, requiredTypes map[string]bool
 }
 
 func GenerateResourceUtils() error {
-	modulePath = "github.com/fastenhealth/gofhir-models-gen"
-	packageName = "fhir"
-	serializableResources = []string{"Signature", "CodeableConcept"}
+	serializableResources = unique(serializableResources)
+	sort.Strings(serializableResources)
 
 	fmt.Printf("Generate utility package")
 	file := jen.NewFile("utils")
@@ -389,11 +388,11 @@ func GenerateResourceUtils() error {
 
 	fmt.Printf("%#v", file)
 
-	err = os.MkdirAll(path.Join(packageName, "utils"), os.ModePerm)
+	err = os.MkdirAll("utils", os.ModePerm)
 	if err != nil {
 		return err
 	}
-	err = file.Save(path.Join(packageName, "utils/map_to_resource.go"))
+	err = file.Save("utils/map_to_resource.go")
 	return err
 }
 

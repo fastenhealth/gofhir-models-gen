@@ -23,7 +23,7 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:     "gofhir-models-gen",
-	Version: "0.0.1",
+	Version: "0.0.6",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
