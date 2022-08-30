@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	. "strings"
@@ -29,7 +30,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var modulePath string
 var packageName string
+var serializableResources []string
 
 type Resource struct {
 	ResourceType string
@@ -77,6 +80,8 @@ var genResourcesCmd = &cobra.Command{
 		resources["StructureDefinition"] = make(map[string][]byte)
 		resources["ValueSet"] = make(map[string][]byte)
 		resources["CodeSystem"] = make(map[string][]byte)
+
+		serializableResources = []string{}
 
 		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -177,6 +182,12 @@ var genResourcesCmd = &cobra.Command{
 		}
 
 		err = generateTypes(resources, make(map[string]bool, 0), requiredTypes, requiredValueSetBindings)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		err = GenerateResourceUtils()
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -307,7 +318,83 @@ func generateResourceOrType(resources ResourceMap, requiredTypes map[string]bool
 			)
 	}
 
+	// add to serializableResources list
+	if definition.Kind == fhir.StructureDefinitionKindResource {
+		serializableResources = append(serializableResources, definition.Name)
+	}
+
 	return file, nil
+}
+
+func GenerateResourceUtils() error {
+	modulePath = "github.com/fastenhealth/gofhir-models-gen"
+	packageName = "fhir"
+	serializableResources = []string{"Signature", "CodeableConcept"}
+
+	fmt.Printf("Generate utility package")
+	file := jen.NewFile("utils")
+	appendLicenseComment(file)
+	appendGeneratorComment(file)
+
+	resourceRawJson := json.RawMessage{}
+
+	var partial map[string]interface{}
+	err := json.Unmarshal(resourceRawJson, &partial)
+
+	//TODO generate function similar to https://github.com/intervention-engine/fhir/blob/master/models/util.go
+
+	//func MapToResource(resourceRawJson json.RawMessage, asPointer bool) (interface{}, error) {
+	file.Func().Id("MapToResource").
+		Params(jen.Id("resourceRawJson").Qual("encoding/json", "RawMessage"), jen.Id("asPointer").Id("bool")).Params(jen.Interface(), jen.Error()).
+		Block(
+			// var partial map[string]interface{}
+			jen.Var().Id("partial").Map(jen.String()).Interface(),
+			// err := json.Unmarshal(resourceRawJson, &partial)
+			jen.Id("err").Op(":=").Qual("encoding/json", "Unmarshal").Params(jen.Id("resourceRawJson"), jen.Id("&partial")),
+			// if err != nil { return nil, err }
+			jen.If(jen.Id("err").Op("!=").Nil()).Block(jen.Return(jen.Nil(), jen.Id("err"))),
+			//t, tOk := partial["resourceType"]
+			jen.List(jen.Id("rt"), jen.Id("rtOk")).Op(":=").Id("partial").Index(jen.Lit("resourceType")),
+			//if !tOk {
+			//	return nil, fmt.Errorf("could not determine resourceType")
+			//}
+			jen.If(jen.Id("!rtOk")).Block(jen.Return(jen.List(jen.Nil(), jen.Qual("fmt", "Errorf").Params(jen.Lit("could not determine resourceType"))))),
+
+			/*
+						switch rt {
+						case "Account":
+				    		x := fhir.Signature{}
+						    uerr := json.Unmarshal(resourceRawJson, &x)
+						    if asPointer {
+						      return &x, uerr
+						    } else {
+						      return x, uerr
+						    }
+						default:
+							return nil, fmt.Errorf("could not find resource")
+						}
+			*/
+			jen.Switch(jen.Id("rt")).BlockFunc(func(g *jen.Group) {
+				for _, resourceName := range serializableResources {
+					g.Case(jen.Lit(resourceName)).Block(
+						jen.Id("x").Op(":=").Qual(fmt.Sprintf("%s/%s", modulePath, packageName), resourceName).Values(),
+						jen.Id("uerr").Op(":=").Qual("encoding/json", "Unmarshal").Params(jen.Id("resourceRawJson"), jen.Id("&x")),
+						jen.If(jen.Id("asPointer")).Block(jen.Return(jen.Id("&x"), jen.Id("uerr"))).
+							Else().Block(jen.Return(jen.Id("x"), jen.Id("uerr"))),
+					)
+				}
+				g.Default().Block(jen.Return(jen.Nil(), jen.Qual("fmt", "Errorf").Params(jen.Lit("could not decode resource"))))
+			}),
+		)
+
+	fmt.Printf("%#v", file)
+
+	err = os.MkdirAll(path.Join(packageName, "utils"), os.ModePerm)
+	if err != nil {
+		return err
+	}
+	err = file.Save(path.Join(packageName, "utils/map_to_resource.go"))
+	return err
 }
 
 func appendLicenseComment(file *jen.File) {
@@ -501,5 +588,6 @@ func typeCodeToTypeIdentifier(typeCode string) string {
 
 func init() {
 	genResourcesCmd.Flags().StringVar(&packageName, "package", "fhir", "the package name to use for generated files")
+	genResourcesCmd.Flags().StringVar(&modulePath, "modulePath", "github.com/fastenhealth/gofhir-models-gen", "the module name to use for generated files")
 	rootCmd.AddCommand(genResourcesCmd)
 }
