@@ -284,8 +284,15 @@ func generateResourceOrType(resources ResourceMap, requiredTypes map[string]bool
 		return nil, err
 	}
 
-	// generate marshal
 	if definition.Kind == fhir.StructureDefinitionKindResource {
+		// generate resource ref accessor
+		file.Comment("This function returns resource reference information")
+		file.Func().Params(jen.Id("r").Id(definition.Name)).Id("ResourceRef").Params().
+			Params(jen.String(), jen.Op("*").String()).Block(
+			jen.Return(jen.Lit(definition.Name), jen.Id("r").Dot("Id")),
+		)
+
+		// generate marshal
 		file.Type().Id("Other" + definition.Name).Id(definition.Name)
 		file.Commentf("MarshalJSON marshals the given %s as JSON into a byte slice", definition.Name)
 		file.Func().Params(jen.Id("r").Id(definition.Name)).Id("MarshalJSON").Params().
@@ -298,10 +305,8 @@ func generateResourceOrType(resources ResourceMap, requiredTypes map[string]bool
 				jen.Id("ResourceType"):            jen.Lit(definition.Name),
 			})),
 		)
-	}
 
-	// generate unmarshal
-	if definition.Kind == fhir.StructureDefinitionKindResource {
+		// generate unmarshal
 		file.Commentf("Unmarshal%s unmarshals a %s.", definition.Name, definition.Name)
 		file.Func().Id("Unmarshal"+definition.Name).
 			Params(jen.Id("b").Op("[]").Byte()).
@@ -319,10 +324,8 @@ func generateResourceOrType(resources ResourceMap, requiredTypes map[string]bool
 				),
 				jen.Return(jen.Id(FirstLower(definition.Name)), jen.Nil()),
 			)
-	}
 
-	// add to serializableResources list
-	if definition.Kind == fhir.StructureDefinitionKindResource {
+		// add to serializableResources list
 		serializableResources = append(serializableResources, definition.Name)
 	}
 
@@ -342,8 +345,6 @@ func GenerateResourceUtils() error {
 
 	var partial map[string]interface{}
 	err := json.Unmarshal(resourceRawJson, &partial)
-
-	//TODO generate function similar to https://github.com/intervention-engine/fhir/blob/master/models/util.go
 
 	//func MapToResource(resourceRawJson json.RawMessage, asPointer bool) (interface{}, error) {
 	file.Func().Id("MapToResource").
