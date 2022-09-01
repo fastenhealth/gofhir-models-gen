@@ -273,6 +273,9 @@ func generateResourceOrType(resources ResourceMap, requiredTypes map[string]bool
 
 	// generate structs
 	file.Commentf("%s is documented here %s", definition.Name, definition.Url)
+	if definition.Description != nil {
+		file.Comment(*definition.Description)
+	}
 	var err error
 	file.Type().Id(definition.Name).StructFunc(func(rootStruct *jen.Group) {
 		_, err = appendFields(resources, requiredTypes, requiredValueSetBindings, file, rootStruct, definition.Name, elementDefinitions, 1, 1)
@@ -495,6 +498,16 @@ func appendFields(resources ResourceMap, requiredTypes map[string]bool, required
 							backboneElementName := parentName + name
 							statement.Id(backboneElementName)
 							var err error
+
+							if element.Definition != nil {
+								file.Comment(*element.Definition)
+							}
+							if element.Comment != nil {
+								file.Comment(*element.Comment)
+							}
+							if element.MeaningWhenMissing != nil {
+								file.Comment(*element.MeaningWhenMissing)
+							}
 							file.Type().Id(backboneElementName).StructFunc(func(childFields *jen.Group) {
 								//var err error
 								i, err = appendFields(resources, requiredTypes, requiredValueSetBindings, file, childFields, backboneElementName, elementDefinitions, i+1, level+1)
