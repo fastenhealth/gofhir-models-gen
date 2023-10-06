@@ -292,6 +292,19 @@ func generateResourceOrType(resources ResourceMap, requiredTypes map[string]bool
 			jen.Return(jen.Lit(definition.Name), jen.Id("r").Dot("Id")),
 		)
 
+		// generate resource contained accessor
+		file.Comment("This function returns resource reference information")
+		file.Func().Params(jen.Id("r").Id(definition.Name)).Id("ContainedResources").Params().
+			Params(jen.Op("[]").Qual("encoding/json", "RawMessage")).BlockFunc(func(containedGroup *jen.Group) {
+			//check if this resource has a field called "contained"
+			if resourceHasContainedField(elementDefinitions, 1) {
+				containedGroup.Return(jen.Id("r").Dot("Contained"))
+				return
+			} else {
+				containedGroup.Return(jen.Nil())
+			}
+		})
+
 		// generate marshal
 		file.Type().Id("Other" + definition.Name).Id(definition.Name)
 		file.Commentf("MarshalJSON marshals the given %s as JSON into a byte slice", definition.Name)
@@ -460,6 +473,10 @@ func appendFields(resources ResourceMap, requiredTypes map[string]bool, required
 						}
 					}
 				}
+			} else {
+				//Contained resources should be stored as a slice of json.RawMessage fields
+				fields.Id(name).Op("[]").Qual("encoding/json", "RawMessage").Tag(map[string]string{"json": pathParts[level] + ",omitempty", "bson": pathParts[level] + ",omitempty"})
+
 			}
 		} else {
 			// index of the next parent sibling
@@ -641,4 +658,20 @@ func init() {
 	genResourcesCmd.Flags().StringVar(&packageName, "package", "fhir", "the package name to use for generated files")
 	genResourcesCmd.Flags().StringVar(&modulePath, "modulePath", "github.com/fastenhealth/gofhir-models-gen", "the module name to use for generated files")
 	rootCmd.AddCommand(genResourcesCmd)
+}
+
+// check if this resource definition has a Contained field
+func resourceHasContainedField(elementDefinitions []fhir.ElementDefinition, level int) bool {
+	for _, element := range elementDefinitions {
+
+		pathParts := Split(element.Path, ".")
+		if len(pathParts) == level+1 {
+			// direct childs
+			name := Title(pathParts[level])
+			if name == "Contained" {
+				return true
+			}
+		}
+	}
+	return false
 }
