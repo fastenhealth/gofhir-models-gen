@@ -66,11 +66,22 @@ func generateValueSet(resources ResourceMap, valueSet fhir.ValueSet) (*jen.File,
 		Id("UnmarshalJSON").
 		Params(jen.Id("json").Op("[]").Byte()).
 		Error().
-		Block(
-			jen.Id("s").Op(":=").Qual("strings", "Trim").Call(jen.String().Call(jen.Id("json")), jen.Lit(`"`)),
-			jen.Switch(jen.Id("s")).BlockFunc(unmarshalRoot(*valueSet.Name, codeSystem.Concept)),
-			jen.Return(jen.Nil()),
-		)
+		BlockFunc(func(group *jen.Group) {
+			//check if all codes are lowercase
+			requireLowercase := true
+			for _, concept := range codeSystem.Concept {
+				if !isLowerCase(concept.Code) {
+					requireLowercase = false
+				}
+			}
+
+			group.Id("s").Op(":=").Qual("strings", "Trim").Call(jen.String().Call(jen.Id("json")), jen.Lit(`"`))
+			if requireLowercase {
+				group.Id("s").Op("=").Qual("strings", "ToLower").Call(jen.Id("s"))
+			}
+			group.Switch(jen.Id("s")).BlockFunc(unmarshalRoot(*valueSet.Name, codeSystem.Concept))
+			group.Return(jen.Nil())
+		})
 
 	// String function
 	file.Func().
@@ -223,4 +234,8 @@ func definitions(valueSetName string, concepts []fhir.CodeSystemConcept) func(gr
 			}
 		}
 	}
+}
+
+func isLowerCase(s string) bool {
+	return s == strings.ToLower(s)
 }
