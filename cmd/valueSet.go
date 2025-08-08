@@ -64,10 +64,19 @@ func generateValueSet(resources ResourceMap, valueSet fhir.ValueSet) (*jen.File,
 	file.Func().
 		Params(jen.Id("code").Op("*").Id(*valueSet.Name)).
 		Id("UnmarshalJSON").
-		Params(jen.Id("json").Op("[]").Byte()).
+		Params(jen.Id("input").Op("[]").Byte()).
 		Error().
 		BlockFunc(func(group *jen.Group) {
-			//check if all codes are lowercase
+			// Unmarshal input into a temporary variable
+			group.Var().Id("s").String()
+			group.If(
+				jen.Id("err").Op(":=").Qual("encoding/json", "Unmarshal").Call(jen.Id("input"), jen.Op("&").Id("s")),
+				jen.Id("err").Op("!=").Nil(),
+			).Block(
+				jen.Return(jen.Qual("fmt", "Errorf").Call(jen.Lit("failed to Unmarshal "+*valueSet.Name+" code `%s`"), jen.Id("s"))),
+			)
+
+			// Check if all codes are lowercase
 			requireLowercase := true
 			for _, concept := range codeSystem.Concept {
 				if !isLowerCase(concept.Code) {
@@ -75,7 +84,6 @@ func generateValueSet(resources ResourceMap, valueSet fhir.ValueSet) (*jen.File,
 				}
 			}
 
-			group.Id("s").Op(":=").Qual("strings", "Trim").Call(jen.String().Call(jen.Id("json")), jen.Lit(`"`))
 			if requireLowercase {
 				group.Id("s").Op("=").Qual("strings", "ToLower").Call(jen.Id("s"))
 			}

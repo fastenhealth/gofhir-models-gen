@@ -10,7 +10,7 @@ This repository contains a tool that can be used to generate FHIR R4 Go Models.
 # download structure files from HL7 (zip file containing json files)
 ./gen-resources.sh
 
-# install the generator
+# install the generator (this repository)
 go mod vendor
 go install
 gofhir-models-gen --help
